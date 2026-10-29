@@ -28,13 +28,13 @@ Beneficios que se evaluarán:
 | Divisas | Frankfurter | REST / JSON | `https://api.frankfurter.app/latest?from=USD&to=MXN` | Tipo de cambio de USD a MXN |
 | Composite API | Propio | REST / JSON | `/api/v1/product-summary/{id}` | Agrega producto, inventario y conversión a MXN |
 
-> **Estado actual:** catálogo e inventario están implementados con datos de ejemplo en H2. El cliente backend de Frankfurter ya está implementado; falta capturar la consulta externa en Postman y desarrollar la Composite API.
+> **Estado actual:** catálogo, inventario, cliente de Frankfurter y Composite API están implementados. Queda guardar la evidencia 5.4 y completar las conclusiones después de probar el flujo.
 
 ## 4. Detalles de implementación previstos
 
 ### Orquestación
 
-El cliente de Frankfurter está implementado con `RestClient`, con límites de conexión y lectura. El agregador combinará las consultas independientes en paralelo con las herramientas asíncronas de Java/Spring. Así, el tiempo de respuesta no tiene que ser la suma de sus latencias, sino que se aproxima a la llamada más lenta, más el procesamiento del agregador.
+El cliente de Frankfurter está implementado con `RestClient`, con límites de conexión y lectura. La Composite API consulta en paralelo el catálogo, el inventario y Frankfurter mediante `CompletableFuture` y un executor acotado de tres hilos. Así, el tiempo de espera evita sumar secuencialmente las latencias de las tres fuentes.
 
 ### Conversión de moneda
 
@@ -44,11 +44,11 @@ Frankfurter devuelve el tipo de cambio en `rates.MXN`. La conversión se calcula
 precioMXN = precioUSD × tipoDeCambio
 ```
 
-El cliente valida que Frankfurter devuelva el tipo de cambio MXN y propaga los errores de HTTP; no sustituye un error con una tasa ficticia. Para evitar errores de precisión monetaria se usará `BigDecimal`. El tipo de cambio y la fecha usados deben aparecer en la respuesta agregada o ser verificables desde ella.
+El cliente valida que Frankfurter devuelva el tipo de cambio MXN y sigue la redirección del dominio legado; no sustituye errores con una tasa ficticia. El agregador calcula `precioUSD × tipoDeCambio` usando `BigDecimal` y redondeo a dos decimales (`HALF_UP`), y devuelve el tipo de cambio y la fecha usados.
 
 ### Resiliencia
 
-Se definirán límites de tiempo y respuestas ante errores de cada dependencia. Un fallback solo se utilizará si queda explícitamente implementado y documentado; no se presentarán datos ficticios como si fueran datos actuales. La política final deberá aclarar si inventario y divisas son críticos para el resumen y qué información puede omitirse ante una falla.
+La llamada a Frankfurter tiene límites de conexión y lectura. Si el producto o inventario solicitado no existe, el agregador responde `404`; ante un error del servicio de divisas responde `502 Bad Gateway`. No se usa un tipo de cambio falso como fallback.
 
 ### Stack detectado
 
@@ -107,7 +107,9 @@ Capturar las evidencias con Postman, Insomnia o una herramienta equivalente **de
 ### 5.4 Composite API
 
 - Endpoint: `GET /api/v1/product-summary/{id}`
-- Evidencia: **pendiente**. Capturar el JSON unificado después de comprobar que integra las fuentes y calcula el precio en MXN.
+- Respuesta: producto, inventario, tipo de cambio y fecha, y precio calculado en MXN.
+- El precio de ejemplo `79.99 USD` con la tasa consultada al momento se devuelve redondeado a dos decimales en `priceMxn`.
+- **Pausa aquí:** inicia la aplicación y prueba `GET http://localhost:8080/api/v1/product-summary/1` en Postman. Guarda una captura que muestre `200 OK` y el JSON unificado; confirma que `priceMxn` coincide con `priceUsd × exchangeRate`, redondeado a dos decimales. Este es el punto para la evidencia 5.4.
 
 ## 6. Conclusiones y lecciones aprendidas
 
@@ -116,8 +118,8 @@ Capturar las evidencias con Postman, Insomnia o una herramienta equivalente **de
 ## 7. Repositorio de código fuente
 
 - Repositorio: [ExamfnBarroso en GitHub](https://github.com/FullStyle1/ExamfnBarroso)
-- Ramas publicadas: `main`, `developer`, `feat/catalogo` y `feat/inventario`
-- Rama actual de divisas: `feat/divisas` (avance local pendiente de publicar)
+- Ramas publicadas: `main`, `developer`, `feat/catalogo`, `feat/inventario`, `feat/divisas` y `feat/composite`
+- Rama actual de trabajo: `feat/composite`
 - El código fuente del backend está en [`backend/`](./backend).
 
 ## Cómo ejecutar el proyecto
@@ -129,11 +131,11 @@ Se requiere un JDK compatible con Java 21. Desde PowerShell, en la carpeta `back
 .\mvnw.cmd spring-boot:run
 ```
 
-La aplicación usa el puerto predeterminado de Spring Boot (`8080`). Los endpoints de catálogo e inventario están disponibles. El cliente de Frankfurter se usa desde el backend al conectar la Composite API; todavía no hay un endpoint local de divisas.
+La aplicación usa el puerto predeterminado de Spring Boot (`8080`). Los endpoints de catálogo, inventario y la Composite API están disponibles. El cliente de Frankfurter se consume desde la capa agregadora; no hay un endpoint local independiente de divisas.
 
 ## Siguiente recorrido
 
 1. **Catálogo implementado y validado:** guardar la evidencia 5.1.
-2. **Ahora: guarda la evidencia 5.3 consultando directamente Frankfurter en Postman; detente aquí.**
-3. Después de guardar la captura, implementar la orquestación y pausar para la evidencia 5.4.
+2. Guardar la evidencia 5.3 consultando Frankfurter directamente en Postman.
+3. **Ahora: prueba la Composite API y guarda la evidencia 5.4; detente aquí.**
 4. Redactar las conclusiones con base en las pruebas observadas.
