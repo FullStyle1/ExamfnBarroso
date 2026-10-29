@@ -35,4 +35,19 @@ class ExamfnBarrosoApplicationTests {
 		mockMvc.perform(get("/microservices/products/999"))
 				.andExpect(status().isNotFound());
 	}
+
+	@Test
+	void getInventoryReturnsStockAndWarehouse() throws Exception {
+		mockMvc.perform(get("/microservices/inventory/1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.productId").value(1))
+				.andExpect(jsonPath("$.availableStock").value(25))
+				.andExpect(jsonPath("$.warehouseLocation").value("Almacen central - Ciudad de Mexico"));
+	}
+
+	@Test
+	void getUnknownInventoryReturnsNotFound() throws Exception {
+		mockMvc.perform(get("/microservices/inventory/999"))
+				.andExpect(status().isNotFound());
+	}
 }

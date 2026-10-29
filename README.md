@@ -28,7 +28,7 @@ Beneficios que se evaluarán:
 | Divisas | Frankfurter | REST / JSON | `https://api.frankfurter.app/latest?from=USD&to=MXN` | Tipo de cambio de USD a MXN |
 | Composite API | Propio | REST / JSON | `/api/v1/product-summary/{id}` | Agrega producto, inventario y conversión a MXN |
 
-> **Estado actual:** el endpoint del catálogo ya está implementado con datos de ejemplo en H2. Inventario, integración con Frankfurter y Composite API siguen pendientes.
+> **Estado actual:** los endpoints de catálogo e inventario ya están implementados con datos de ejemplo en H2. La integración con Frankfurter y la Composite API siguen pendientes.
 
 ## 4. Detalles de implementación previstos
 
@@ -57,7 +57,7 @@ Se definirán límites de tiempo y respuestas ante errores de cada dependencia. 
 - Maven Wrapper
 - Spring Web, Spring Data JPA, Bean Validation y base de datos H2 configurados en el proyecto
 
-La aplicación inicia desde `backend/src/main/java/com/fullstyle/examfnbarroso/ExamfnBarrosoApplication.java`. El catálogo usa Spring Data JPA y H2; el producto de ejemplo con ID `1` se inserta al iniciar si todavía no existe.
+La aplicación inicia desde `backend/src/main/java/com/fullstyle/examfnbarroso/ExamfnBarrosoApplication.java`. El catálogo y el inventario usan Spring Data JPA y H2; los datos de ejemplo con ID `1` se insertan al iniciar si todavía no existen.
 
 ## 5. Evidencias de funcionamiento
 
@@ -83,8 +83,20 @@ Capturar las evidencias con Postman, Insomnia o una herramienta equivalente **de
 
 ### 5.2 Inventario
 
-- Endpoint: `GET /microservices/inventory/{id}`
-- Evidencia: **pendiente**. Guardar la captura de la respuesta individual antes de continuar.
+- Endpoint implementado: `GET /microservices/inventory/{id}`
+- Producto de prueba: ID `1`, 25 unidades en `Almacen central - Ciudad de Mexico`.
+- Respuesta esperada:
+
+```json
+{
+  "productId": 1,
+  "availableStock": 25,
+  "warehouseLocation": "Almacen central - Ciudad de Mexico"
+}
+```
+
+- Si el inventario no existe, responde `404 Not Found`.
+- **Evidencia 5.2:** prueba `GET http://localhost:8080/microservices/inventory/1` en Postman y guarda una captura con la petición y respuesta `200 OK`. Después, detente antes de integrar la API de divisas.
 
 ### 5.3 Divisas (Frankfurter)
 
@@ -103,8 +115,8 @@ Capturar las evidencias con Postman, Insomnia o una herramienta equivalente **de
 ## 7. Repositorio de código fuente
 
 - Repositorio: [ExamfnBarroso en GitHub](https://github.com/FullStyle1/ExamfnBarroso)
-- Rama de trabajo local detectada: `developer`
-- La rama `main` remota todavía no aparece publicada desde este entorno.
+- Ramas publicadas: `main`, `developer`, `feat/catalogo` y `feat/inventario`
+- Rama local de trabajo: `developer`
 - El código fuente del backend está en [`backend/`](./backend).
 
 ## Cómo ejecutar el proyecto
@@ -116,12 +128,12 @@ Se requiere un JDK compatible con Java 21. Desde PowerShell, en la carpeta `back
 .\mvnw.cmd spring-boot:run
 ```
 
-La aplicación usa el puerto predeterminado de Spring Boot (`8080`). El catálogo está disponible; las demás rutas de la tabla anterior aún no están implementadas.
+La aplicación usa el puerto predeterminado de Spring Boot (`8080`). Los endpoints de catálogo e inventario están disponibles; la integración con divisas y el agregador aún están pendientes.
 
 ## Siguiente recorrido
 
 1. **Catálogo implementado y validado:** guardar la evidencia 5.1.
-2. Continuar con el endpoint de inventario y pausar para la evidencia 5.2.
-3. Integrar Frankfurter y pausar para la evidencia 5.3.
+2. **Ahora: probar inventario y guardar la evidencia 5.2; detenerse aquí.**
+3. Después de guardar la captura, integrar Frankfurter y pausar para la evidencia 5.3.
 4. Implementar la orquestación, conversión y manejo de errores de la Composite API; pausar para la evidencia 5.4.
 5. Redactar las conclusiones con base en las pruebas observadas.
