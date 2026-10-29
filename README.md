@@ -26,29 +26,29 @@ Beneficios que se evaluarán:
 | Catálogo | Propio | REST / JSON | `/microservices/products/{id}` | Nombre, descripción y precio base en USD |
 | Inventario | Propio | REST / JSON | `/microservices/inventory/{id}` | Existencias disponibles y ubicación del almacén |
 | Divisas | Frankfurter | REST / JSON | `https://api.frankfurter.app/latest?from=USD&to=MXN` | Tipo de cambio de USD a MXN |
-| Composite API | Propio | REST / JSON | `/api/v1/product-summary/{id}` | Agrega producto, inventario y conversión a MXN |
+| Composite API | Propio | REST / JSON | `/api/v1/product-summary/{id}` o `/api/v1/products/{id}/summary` | Agrega producto, inventario y conversión a MXN |
 
-> **Estado actual:** estos endpoints son el contrato del examen; todavía no están implementados. El repositorio contiene únicamente el esqueleto inicial de Spring Boot.
+Catálogo e inventario exponen endpoints REST dentro de la misma aplicación Spring Boot y persisten en H2. Para cumplir el flujo de consumo del ejercicio, el agregador llama esos endpoints por HTTP mediante clientes configurables; sus URL base se controlan con `CATALOG_SERVICE_URL` e `INVENTORY_SERVICE_URL` y, de forma predeterminada, usan `http://localhost:8080`. Frankfurter se consume como API externa.
 
 ## 4. Detalles de implementación previstos
 
 ### Orquestación
 
-Las llamadas independientes se ejecutarán en paralelo con las herramientas asíncronas de Java/Spring. Así, el tiempo de respuesta no tiene que ser la suma de las latencias de catálogo, inventario y divisas, sino que se aproxima a la de la llamada más lenta, más el procesamiento del agregador.
+El agregador consulta por HTTP en paralelo los endpoints REST de catálogo e inventario y la API de Frankfurter mediante `CompletableFuture` y un executor acotado a tres hilos. Los tres clientes HTTP usan `RestClient`; las llamadas tienen límites de conexión de tres segundos y lectura de cinco segundos. Catálogo e Inventario están en la misma aplicación Spring Boot en esta entrega, por lo que las llamadas internas apuntan por defecto a `localhost:8080`; sus URL base se pueden configurar por separado para otros hosts o puertos.
 
 ### Conversión de moneda
 
 Frankfurter devuelve el tipo de cambio en `rates.MXN`. La conversión se calculará como:
 
 ```text
-precioMXN = precioUSD × tipoDeCambio
+price_mxn = price_usd × exchange_rate
 ```
 
-Para evitar errores de precisión monetaria se usará `BigDecimal`. El tipo de cambio y la fecha usados deben aparecer en la respuesta agregada o ser verificables desde ella.
+El cliente valida que Frankfurter devuelva el tipo de cambio MXN y sigue la redirección del dominio legado; no sustituye errores con una tasa ficticia. El agregador calcula `price_usd × exchange_rate` usando `BigDecimal` y redondeo a dos decimales (`HALF_UP`), y devuelve el tipo de cambio y la fecha usados.
 
 ### Resiliencia
 
-Se definirán límites de tiempo y respuestas ante errores de cada dependencia. Un fallback solo se utilizará si queda explícitamente implementado y documentado; no se presentarán datos ficticios como si fueran datos actuales. La política final deberá aclarar si inventario y divisas son críticos para el resumen y qué información puede omitirse ante una falla.
+Las llamadas a las APIs tienen límites de tiempo. Si el producto o inventario solicitado no existe, el agregador responde `404`; ante un error de cualquiera de sus dependencias responde `502 Bad Gateway`. No se usa un tipo de cambio falso como fallback.
 
 ### Stack detectado
 
@@ -57,7 +57,7 @@ Se definirán límites de tiempo y respuestas ante errores de cada dependencia. 
 - Maven Wrapper
 - Spring Web, Spring Data JPA, Bean Validation y base de datos H2 configurados en el proyecto
 
-La aplicación inicia desde `backend/src/main/java/com/fullstyle/examfnbarroso/ExamfnBarrosoApplication.java`. El esqueleto incluye una prueba de carga del contexto; los endpoints y las pruebas de integración están pendientes.
+La aplicación inicia desde `backend/src/main/java/com/fullstyle/examfnbarroso/ExamfnBarrosoApplication.java`. El catálogo y el inventario usan Spring Data JPA y H2; los datos de ejemplo con ID `1` se insertan al iniciar si todavía no existen. El catálogo incluye la categoría `Electronica`; inventario incluye un tiempo estimado de entrega de dos días.
 
 ## 5. Evidencias de funcionamiento
 
@@ -65,33 +65,88 @@ Capturar las evidencias con Postman, Insomnia o una herramienta equivalente **de
 
 ### 5.1 Catálogo
 
-- Endpoint: `GET /microservices/products/{id}`
-- Evidencia: **pendiente**. Detenerse aquí después de validar la respuesta individual para guardar la captura.
+- Endpoint implementado: `GET /microservices/products/{id}`
+- Producto de prueba: ID `1`, audífonos inalámbricos, precio de ejemplo `79.99 USD`.
+- Respuesta esperada:
+
+```json
+{
+  "id": 1,
+  "name": "Audifonos inalambricos",
+  "description": "Audifonos Bluetooth con cancelacion de ruido.",
+  "category": "Electronica",
+  "priceUsd": 79.99
+}
+```
+
+- Si el producto no existe, responde `404 Not Found`.
+- **Evidencia 5.1:** validada en Postman; respuesta `200 OK` para `http://localhost:8080/microservices/products/1`.
 
 ### 5.2 Inventario
 
-- Endpoint: `GET /microservices/inventory/{id}`
-- Evidencia: **pendiente**. Guardar la captura de la respuesta individual antes de continuar.
+- Endpoint implementado: `GET /microservices/inventory/{id}`
+- Producto de prueba: ID `1`, 25 unidades en `Almacen central - Ciudad de Mexico`.
+- Respuesta esperada:
+
+```json
+{
+  "productId": 1,
+  "availableStock": 25,
+  "warehouseLocation": "Almacen central - Ciudad de Mexico",
+  "estimatedDeliveryDays": 2
+}
+```
+
+- Si el inventario no existe, responde `404 Not Found`.
+- **Evidencia 5.2:** endpoint validado en Postman con respuesta `200 OK` para `http://localhost:8080/microservices/inventory/1`.
 
 ### 5.3 Divisas (Frankfurter)
 
 - Endpoint externo: `GET https://api.frankfurter.app/latest?from=USD&to=MXN`
-- Evidencia: **pendiente**. Guardar la respuesta que muestre `base`, `date` y `rates.MXN`.
+- El backend ya cuenta con un cliente HTTP que consume esa ruta, sigue la redirección del dominio legado de Frankfurter, valida que la respuesta contenga la tasa MXN y establece límites de tiempo de conexión y lectura.
+- **Evidencia 5.3:** consulta directa a Frankfurter confirmada en Postman. La tasa y la fecha cambian; se conserva en la captura el valor que devolvió el servicio al momento de la prueba.
 
 ### 5.4 Composite API
 
 - Endpoint: `GET /api/v1/product-summary/{id}`
-- Evidencia: **pendiente**. Capturar el JSON unificado después de comprobar que integra las fuentes y calcula el precio en MXN.
+- Ruta alternativa solicitada en el planteamiento: `GET /api/v1/products/{id}/summary`
+- Las dos rutas devuelven el mismo contrato consolidado: `product_id`, `title`, `description`, `category`, `price_usd`, `price_mxn`, `stock_status`, `available_units`, `warehouse_location`, `estimated_delivery_days`, `currency_conversion_source`, `exchange_rate`, `exchange_rate_date` y `status`.
+- `stock_status` es `IN_STOCK` cuando hay unidades disponibles y `OUT_OF_STOCK` cuando el inventario es cero.
+- El precio de ejemplo `79.99 USD` con la tasa consultada al momento se devuelve redondeado a dos decimales en `price_mxn`.
+- Respuesta representativa (la tasa y fecha son dinámicas):
+
+```json
+{
+  "product_id": 1,
+  "title": "Audifonos inalambricos",
+  "description": "Audifonos Bluetooth con cancelacion de ruido.",
+  "category": "Electronica",
+  "price_usd": 79.99,
+  "price_mxn": 1490.30,
+  "stock_status": "IN_STOCK",
+  "available_units": 25,
+  "warehouse_location": "Almacen central - Ciudad de Mexico",
+  "estimated_delivery_days": 2,
+  "currency_conversion_source": "Frankfurter External API",
+  "exchange_rate": 18.6311,
+  "exchange_rate_date": "2026-10-28",
+  "status": "SUCCESS"
+}
+```
+
+- **Evidencia 5.4 anterior:** validada en Postman con `200 OK` para `GET http://localhost:8080/api/v1/product-summary/1`. Esa captura corresponde al contrato previo, con datos anidados. Tras alinear la respuesta con el contrato de la rúbrica, vuelve a probar la Composite API y reemplaza la captura por una que muestre los campos consolidados.
 
 ## 6. Conclusiones y lecciones aprendidas
 
-**Pendiente de completar después de implementar y probar el flujo.** Documentar los resultados observados, el comportamiento ante fallos y la comparación entre las llamadas individuales y la petición agregada. No afirmar reducciones de latencia ni tolerancia a fallos sin mediciones o pruebas que lo respalden.
+La prueba de integración confirmó que la Composite API reúne en una sola respuesta los datos del catálogo, el inventario y el tipo de cambio externo. Desde el cliente, el flujo de resumen requiere una petición al agregador en lugar de consultar cada fuente por separado. La conversión utiliza `BigDecimal` y redondeo monetario; en la captura, `79.99 USD` a `18.6311 MXN/USD` resultó en `1490.30 MXN`.
+
+La respuesta observada fue `200 OK` y Postman reportó `970 ms` para esa petición. Ese tiempo corresponde a una única ejecución y no basta para concluir que hubo una reducción de latencia; para comparar rendimiento habría que medir varias veces las llamadas individuales y la agregada bajo condiciones equivalentes. Las pruebas automatizadas también verifican respuestas `404` para producto/inventario inexistentes y `502 Bad Gateway` cuando falla la consulta de divisas; no se presenta una tasa ficticia como fallback.
 
 ## 7. Repositorio de código fuente
 
 - Repositorio: [ExamfnBarroso en GitHub](https://github.com/FullStyle1/ExamfnBarroso)
-- Rama de trabajo local detectada: `developer`
-- La rama `main` remota todavía no aparece publicada desde este entorno.
+- Rama de integración y trabajo actual: `developer`
+- Ramas de funcionalidad conservadas: `feat/catalogo`, `feat/inventario`, `feat/divisas` y `feat/composite`
 - El código fuente del backend está en [`backend/`](./backend).
 
 ## Cómo ejecutar el proyecto
@@ -103,15 +158,8 @@ Se requiere un JDK compatible con Java 21. Desde PowerShell, en la carpeta `back
 .\mvnw.cmd spring-boot:run
 ```
 
-La aplicación usa el puerto predeterminado de Spring Boot (`8080`). Por ahora, ejecutar el proyecto solo inicia la aplicación base; las rutas de la tabla anterior aún no responden.
+La aplicación usa el puerto predeterminado de Spring Boot (`8080`). Los endpoints de catálogo, inventario y Composite API están disponibles. La integración usa llamadas HTTP a los dos endpoints propios y a Frankfurter. Las URL base internas se pueden cambiar con las variables de entorno `CATALOG_SERVICE_URL` e `INVENTORY_SERVICE_URL`.
 
 ## Siguiente recorrido
 
-1. Implementar y probar el endpoint del catálogo.
-2. **Pausa para guardar la evidencia 5.1.**
-3. Implementar y probar el endpoint de inventario.
-4. **Pausa para guardar la evidencia 5.2.**
-5. Integrar Frankfurter y registrar la respuesta usada.
-6. **Pausa para guardar la evidencia 5.3.**
-7. Implementar la orquestación, conversión y manejo de errores de la Composite API.
-8. **Pausa para guardar la evidencia 5.4 y redactar las conclusiones.**
+El flujo de implementación y las evidencias de catálogo, inventario y Frankfurter se conservaron. La Composite API ahora invoca los endpoints internos por HTTP y usa el contrato de salida solicitado; actualiza la captura 5.4 para reflejar esa respuesta final.
