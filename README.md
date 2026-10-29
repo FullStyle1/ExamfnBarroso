@@ -79,7 +79,7 @@ Capturar las evidencias con Postman, Insomnia o una herramienta equivalente **de
 ```
 
 - Si el producto no existe, responde `404 Not Found`.
-- **Evidencia 5.1:** guardar una captura de la petición y respuesta `200 OK` de `http://localhost:8080/microservices/products/1`.
+- **Evidencia 5.1:** validada en Postman; respuesta `200 OK` para `http://localhost:8080/microservices/products/1`.
 
 ### 5.2 Inventario
 
@@ -96,24 +96,26 @@ Capturar las evidencias con Postman, Insomnia o una herramienta equivalente **de
 ```
 
 - Si el inventario no existe, responde `404 Not Found`.
-- **Evidencia 5.2:** prueba `GET http://localhost:8080/microservices/inventory/1` en Postman y guarda una captura con la petición y respuesta `200 OK`. Después, detente antes de integrar la API de divisas.
+- **Evidencia 5.2:** endpoint validado en Postman con respuesta `200 OK` para `http://localhost:8080/microservices/inventory/1`.
 
 ### 5.3 Divisas (Frankfurter)
 
 - Endpoint externo: `GET https://api.frankfurter.app/latest?from=USD&to=MXN`
 - El backend ya cuenta con un cliente HTTP que consume esa ruta, sigue la redirección del dominio legado de Frankfurter, valida que la respuesta contenga la tasa MXN y establece límites de tiempo de conexión y lectura.
-- **Pausa aquí:** en Postman crea una solicitud `GET` directa a `https://api.frankfurter.app/latest?from=USD&to=MXN` y pulsa **Send**. Guarda una captura que muestre `200 OK` y el JSON con `base`, `date` y `rates.MXN` para la evidencia 5.3. La tasa y la fecha cambian, así que no uses un valor copiado como evidencia de una consulta real.
+- **Evidencia 5.3:** consulta directa a Frankfurter confirmada en Postman. La tasa y la fecha cambian; se conserva en la captura el valor que devolvió el servicio al momento de la prueba.
 
 ### 5.4 Composite API
 
 - Endpoint: `GET /api/v1/product-summary/{id}`
 - Respuesta: producto, inventario, tipo de cambio y fecha, y precio calculado en MXN.
 - El precio de ejemplo `79.99 USD` con la tasa consultada al momento se devuelve redondeado a dos decimales en `priceMxn`.
-- **Pausa aquí:** inicia la aplicación y prueba `GET http://localhost:8080/api/v1/product-summary/1` en Postman. Guarda una captura que muestre `200 OK` y el JSON unificado; confirma que `priceMxn` coincide con `priceUsd × exchangeRate`, redondeado a dos decimales. Este es el punto para la evidencia 5.4.
+- **Evidencia 5.4:** validada en Postman con `200 OK` para `GET http://localhost:8080/api/v1/product-summary/1`. La respuesta observada incluyó un precio de `79.99 USD`, inventario de 25 unidades, tasa de `18.6311 MXN/USD` con fecha `2026-10-28`, y `priceMxn` de `1490.30`. El cálculo es `79.99 × 18.6311 = 1490.301689`, redondeado a dos decimales.
 
 ## 6. Conclusiones y lecciones aprendidas
 
-**Pendiente de completar después de implementar y probar el flujo.** Documentar los resultados observados, el comportamiento ante fallos y la comparación entre las llamadas individuales y la petición agregada. No afirmar reducciones de latencia ni tolerancia a fallos sin mediciones o pruebas que lo respalden.
+La prueba de integración confirmó que la Composite API reúne en una sola respuesta los datos del catálogo, el inventario y el tipo de cambio externo. Desde el cliente, el flujo de resumen requiere una petición al agregador en lugar de consultar cada fuente por separado. La conversión utiliza `BigDecimal` y redondeo monetario; en la captura, `79.99 USD` a `18.6311 MXN/USD` resultó en `1490.30 MXN`.
+
+La respuesta observada fue `200 OK` y Postman reportó `970 ms` para esa petición. Ese tiempo corresponde a una única ejecución y no basta para concluir que hubo una reducción de latencia; para comparar rendimiento habría que medir varias veces las llamadas individuales y la agregada bajo condiciones equivalentes. Las pruebas automatizadas también verifican respuestas `404` para producto/inventario inexistentes y `502 Bad Gateway` cuando falla la consulta de divisas; no se presenta una tasa ficticia como fallback.
 
 ## 7. Repositorio de código fuente
 
@@ -135,7 +137,4 @@ La aplicación usa el puerto predeterminado de Spring Boot (`8080`). Los endpoin
 
 ## Siguiente recorrido
 
-1. **Catálogo implementado y validado:** guardar la evidencia 5.1.
-2. Guardar la evidencia 5.3 consultando Frankfurter directamente en Postman.
-3. **Ahora: prueba la Composite API y guarda la evidencia 5.4; detente aquí.**
-4. Redactar las conclusiones con base en las pruebas observadas.
+El flujo de implementación y las cuatro evidencias de las secciones 5.1–5.4 quedaron completados. Las conclusiones de la sección 6 se basan en la respuesta observada y distinguen la latencia puntual de una medición comparativa formal.
