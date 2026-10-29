@@ -15,7 +15,7 @@ public class InventoryDataInitializer implements CommandLineRunner {
 	@Override
 	public void run(String... args) {
 		if (!inventory.existsById(1L)) {
-			inventory.save(new Inventory(1L, 25, "Almacen central - Ciudad de Mexico"));
+			inventory.save(new Inventory(1L, 25, "Almacen central - Ciudad de Mexico", 2));
 		}
 	}
 }

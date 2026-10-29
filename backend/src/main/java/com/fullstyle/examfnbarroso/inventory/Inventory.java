@@ -18,13 +18,17 @@ public class Inventory {
 	@Column(name = "warehouse_location", nullable = false, length = 120)
 	private String warehouseLocation;
 
+	@Column(name = "estimated_delivery_days", nullable = false)
+	private int estimatedDeliveryDays;
+
 	protected Inventory() {
 	}
 
-	public Inventory(Long productId, int availableStock, String warehouseLocation) {
+	public Inventory(Long productId, int availableStock, String warehouseLocation, int estimatedDeliveryDays) {
 		this.productId = productId;
 		this.availableStock = availableStock;
 		this.warehouseLocation = warehouseLocation;
+		this.estimatedDeliveryDays = estimatedDeliveryDays;
 	}
 
 	public Long getProductId() {
@@ -37,5 +41,9 @@ public class Inventory {
 
 	public String getWarehouseLocation() {
 		return warehouseLocation;
+	}
+
+	public int getEstimatedDeliveryDays() {
+		return estimatedDeliveryDays;
 	}
 }

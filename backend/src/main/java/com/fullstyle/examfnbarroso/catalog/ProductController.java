@@ -22,6 +22,11 @@ public class ProductController {
 		Product product = products.findById(id)
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
 
-		return new ProductResponse(product.getId(), product.getName(), product.getDescription(), product.getPriceUsd());
+		return new ProductResponse(
+				product.getId(),
+				product.getName(),
+				product.getDescription(),
+				product.getCategory(),
+				product.getPriceUsd());
 	}
 }

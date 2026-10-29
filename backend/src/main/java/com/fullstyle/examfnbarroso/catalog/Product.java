@@ -20,16 +20,20 @@ public class Product {
 	@Column(nullable = false, length = 500)
 	private String description;
 
+	@Column(nullable = false, length = 80)
+	private String category;
+
 	@Column(name = "price_usd", nullable = false, precision = 12, scale = 2)
 	private BigDecimal priceUsd;
 
 	protected Product() {
 	}
 
-	public Product(Long id, String name, String description, BigDecimal priceUsd) {
+	public Product(Long id, String name, String description, String category, BigDecimal priceUsd) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
+		this.category = category;
 		this.priceUsd = priceUsd;
 	}
 
@@ -43,6 +47,10 @@ public class Product {
 
 	public String getDescription() {
 		return description;
+	}
+
+	public String getCategory() {
+		return category;
 	}
 
 	public BigDecimal getPriceUsd() {

@@ -27,6 +27,7 @@ class ExamfnBarrosoApplicationTests {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value(1))
 				.andExpect(jsonPath("$.name").value("Audifonos inalambricos"))
+				.andExpect(jsonPath("$.category").value("Electronica"))
 				.andExpect(jsonPath("$.priceUsd").value(79.99));
 	}
 
@@ -42,7 +43,8 @@ class ExamfnBarrosoApplicationTests {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.productId").value(1))
 				.andExpect(jsonPath("$.availableStock").value(25))
-				.andExpect(jsonPath("$.warehouseLocation").value("Almacen central - Ciudad de Mexico"));
+				.andExpect(jsonPath("$.warehouseLocation").value("Almacen central - Ciudad de Mexico"))
+				.andExpect(jsonPath("$.estimatedDeliveryDays").value(2));
 	}
 
 	@Test

@@ -21,6 +21,7 @@ public class CatalogDataInitializer implements CommandLineRunner {
 					1L,
 					"Audifonos inalambricos",
 					"Audifonos Bluetooth con cancelacion de ruido.",
+					"Electronica",
 					new BigDecimal("79.99")));
 		}
 	}

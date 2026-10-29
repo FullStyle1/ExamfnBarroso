@@ -6,36 +6,38 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 
-import com.fullstyle.examfnbarroso.catalog.Product;
-import com.fullstyle.examfnbarroso.catalog.ProductRepository;
+import com.fullstyle.examfnbarroso.catalog.CatalogApiClient;
 import com.fullstyle.examfnbarroso.catalog.ProductResponse;
 import com.fullstyle.examfnbarroso.currency.ExchangeRateResponse;
 import com.fullstyle.examfnbarroso.currency.FrankfurterClient;
-import com.fullstyle.examfnbarroso.inventory.Inventory;
-import com.fullstyle.examfnbarroso.inventory.InventoryRepository;
+import com.fullstyle.examfnbarroso.inventory.InventoryApiClient;
 import com.fullstyle.examfnbarroso.inventory.InventoryResponse;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ProductSummaryService {
 
-	private final ProductRepository products;
-	private final InventoryRepository inventory;
+	private static final String CURRENCY_SOURCE = "Frankfurter External API";
+	private static final String SUCCESS_STATUS = "SUCCESS";
+
+	private final CatalogApiClient catalogApiClient;
+	private final InventoryApiClient inventoryApiClient;
 	private final FrankfurterClient frankfurterClient;
 	private final Executor executor;
 
 	public ProductSummaryService(
-			ProductRepository products,
-			InventoryRepository inventory,
+			CatalogApiClient catalogApiClient,
+			InventoryApiClient inventoryApiClient,
 			FrankfurterClient frankfurterClient,
 			@Qualifier("compositeExecutor") Executor executor) {
-		this.products = products;
-		this.inventory = inventory;
+		this.catalogApiClient = catalogApiClient;
+		this.inventoryApiClient = inventoryApiClient;
 		this.frankfurterClient = frankfurterClient;
 		this.executor = executor;
 	}
@@ -66,23 +68,40 @@ public class ProductSummaryService {
 				.setScale(2, RoundingMode.HALF_UP);
 
 		return new ProductSummaryResponse(
-				productDetails,
-				inventoryDetails,
+				productDetails.id(),
+				productDetails.name(),
+				productDetails.description(),
+				productDetails.category(),
+				productDetails.priceUsd(),
+				priceMxn,
+				inventoryDetails.availableStock() > 0 ? "IN_STOCK" : "OUT_OF_STOCK",
+				inventoryDetails.availableStock(),
+				inventoryDetails.warehouseLocation(),
+				inventoryDetails.estimatedDeliveryDays(),
+				CURRENCY_SOURCE,
 				rate.mxnRate(),
 				rate.date(),
-				priceMxn);
+				SUCCESS_STATUS);
 	}
 
 	private ProductResponse findProduct(Long id) {
-		Product product = products.findById(id)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
-		return new ProductResponse(product.getId(), product.getName(), product.getDescription(), product.getPriceUsd());
+		try {
+			return catalogApiClient.getProduct(id);
+		} catch (RestClientResponseException exception) {
+			throw mapInternalApiError(exception, "Catalog");
+		} catch (RestClientException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Catalog service is unavailable", exception);
+		}
 	}
 
 	private InventoryResponse findInventory(Long id) {
-		Inventory item = inventory.findById(id)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory not found"));
-		return new InventoryResponse(item.getProductId(), item.getAvailableStock(), item.getWarehouseLocation());
+		try {
+			return inventoryApiClient.getInventory(id);
+		} catch (RestClientResponseException exception) {
+			throw mapInternalApiError(exception, "Inventory");
+		} catch (RestClientException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Inventory service is unavailable", exception);
+		}
 	}
 
 	private ExchangeRateResponse getExchangeRate() {
@@ -91,5 +110,13 @@ public class ProductSummaryService {
 		} catch (RestClientException | IllegalStateException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Exchange rate service is unavailable", exception);
 		}
+	}
+
+	private ResponseStatusException mapInternalApiError(RestClientResponseException exception, String serviceName) {
+		if (exception.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
+			return new ResponseStatusException(HttpStatus.NOT_FOUND, serviceName + " resource not found", exception);
+		}
+		return new ResponseStatusException(
+				HttpStatus.BAD_GATEWAY, serviceName + " service returned an error", exception);
 	}
 }

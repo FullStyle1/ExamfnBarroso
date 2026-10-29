@@ -22,6 +22,10 @@ public class InventoryController {
 		Inventory item = inventory.findById(id)
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory not found"));
 
-		return new InventoryResponse(item.getProductId(), item.getAvailableStock(), item.getWarehouseLocation());
+		return new InventoryResponse(
+				item.getProductId(),
+				item.getAvailableStock(),
+				item.getWarehouseLocation(),
+				item.getEstimatedDeliveryDays());
 	}
 }
