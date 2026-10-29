@@ -28,7 +28,7 @@ Beneficios que se evaluarán:
 | Divisas | Frankfurter | REST / JSON | `https://api.frankfurter.app/latest?from=USD&to=MXN` | Tipo de cambio de USD a MXN |
 | Composite API | Propio | REST / JSON | `/api/v1/product-summary/{id}` | Agrega producto, inventario y conversión a MXN |
 
-> **Estado actual:** estos endpoints son el contrato del examen; todavía no están implementados. El repositorio contiene únicamente el esqueleto inicial de Spring Boot.
+> **Estado actual:** el endpoint del catálogo ya está implementado con datos de ejemplo en H2. Inventario, integración con Frankfurter y Composite API siguen pendientes.
 
 ## 4. Detalles de implementación previstos
 
@@ -57,7 +57,7 @@ Se definirán límites de tiempo y respuestas ante errores de cada dependencia. 
 - Maven Wrapper
 - Spring Web, Spring Data JPA, Bean Validation y base de datos H2 configurados en el proyecto
 
-La aplicación inicia desde `backend/src/main/java/com/fullstyle/examfnbarroso/ExamfnBarrosoApplication.java`. El esqueleto incluye una prueba de carga del contexto; los endpoints y las pruebas de integración están pendientes.
+La aplicación inicia desde `backend/src/main/java/com/fullstyle/examfnbarroso/ExamfnBarrosoApplication.java`. El catálogo usa Spring Data JPA y H2; el producto de ejemplo con ID `1` se inserta al iniciar si todavía no existe.
 
 ## 5. Evidencias de funcionamiento
 
@@ -65,8 +65,21 @@ Capturar las evidencias con Postman, Insomnia o una herramienta equivalente **de
 
 ### 5.1 Catálogo
 
-- Endpoint: `GET /microservices/products/{id}`
-- Evidencia: **pendiente**. Detenerse aquí después de validar la respuesta individual para guardar la captura.
+- Endpoint implementado: `GET /microservices/products/{id}`
+- Producto de prueba: ID `1`, audífonos inalámbricos, precio de ejemplo `79.99 USD`.
+- Respuesta esperada:
+
+```json
+{
+  "id": 1,
+  "name": "Audifonos inalambricos",
+  "description": "Audifonos Bluetooth con cancelacion de ruido.",
+  "priceUsd": 79.99
+}
+```
+
+- Si el producto no existe, responde `404 Not Found`.
+- **Evidencia 5.1:** guardar una captura de la petición y respuesta `200 OK` de `http://localhost:8080/microservices/products/1`.
 
 ### 5.2 Inventario
 
@@ -103,15 +116,12 @@ Se requiere un JDK compatible con Java 21. Desde PowerShell, en la carpeta `back
 .\mvnw.cmd spring-boot:run
 ```
 
-La aplicación usa el puerto predeterminado de Spring Boot (`8080`). Por ahora, ejecutar el proyecto solo inicia la aplicación base; las rutas de la tabla anterior aún no responden.
+La aplicación usa el puerto predeterminado de Spring Boot (`8080`). El catálogo está disponible; las demás rutas de la tabla anterior aún no están implementadas.
 
 ## Siguiente recorrido
 
-1. Implementar y probar el endpoint del catálogo.
-2. **Pausa para guardar la evidencia 5.1.**
-3. Implementar y probar el endpoint de inventario.
-4. **Pausa para guardar la evidencia 5.2.**
-5. Integrar Frankfurter y registrar la respuesta usada.
-6. **Pausa para guardar la evidencia 5.3.**
-7. Implementar la orquestación, conversión y manejo de errores de la Composite API.
-8. **Pausa para guardar la evidencia 5.4 y redactar las conclusiones.**
+1. **Catálogo implementado y validado:** guardar la evidencia 5.1.
+2. Continuar con el endpoint de inventario y pausar para la evidencia 5.2.
+3. Integrar Frankfurter y pausar para la evidencia 5.3.
+4. Implementar la orquestación, conversión y manejo de errores de la Composite API; pausar para la evidencia 5.4.
+5. Redactar las conclusiones con base en las pruebas observadas.
